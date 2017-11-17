@@ -1,0 +1,1 @@
+Connect ESP-8266 with BMP280 sensor.
