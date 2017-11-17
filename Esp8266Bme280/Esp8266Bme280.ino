@@ -4,6 +4,9 @@
 #include <Adafruit_BMP280.h>
 #include <ThingSpeak.h>
 
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
 #include <ESP8266WiFi.h>
 /*
  * #define MY_WIFI_SSID "WIFI_SSID"
@@ -37,6 +40,13 @@ const float seaLevelPressureConst = 1016.38;
 #define SDA 0 //GPIO0 D3
 #define SCL 2 //GPIO2 D4
 
+//DALLAS DS18B20 - Temp senspr Settings
+#define ONE_WIRE_BUS D2
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+DeviceAddress insideThermometer;
+bool dallasInitialized;
+
 // Wi-Fi Settings
 const char* ssid = MY_WIFI_SSID;
 const char* password = MY_WIFI_PASSWORD;
@@ -62,6 +72,31 @@ void setup() {
   }
   Serial.println("BMP280 connected");
 
+  sensors.begin();
+  byte dallasDeviceCount = sensors.getDeviceCount();
+  if (dallasDeviceCount==0){
+    Serial.println("Dallas devices: absent");
+  } else {
+    Serial.println(dallasDeviceCount, DEC);
+    if (sensors.getAddress(insideThermometer, 0)) {
+      sensors.setResolution(insideThermometer, 9);
+
+      dallasInitialized = true;
+
+      Serial.print("Dallas device 0 connected. Address: ");
+      for (byte i = 0; i < 8; i++)
+      {
+        if (insideThermometer[i] < 16) {
+          Serial.print("0");
+        }
+        Serial.print(insideThermometer[i], HEX);
+      }
+      Serial.println();
+    } else {
+      Serial.println("Dallas devices: unable to find address for Device 0"); 
+    }
+  }
+  
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -95,18 +130,35 @@ void readBMP280Value(float seaLevelPressureGPA, float &temperatureCelsius, float
   Serial.print("Approx altitude = ");
   Serial.print(altitudeMeters);
   Serial.println(" m");
+}
 
-  Serial.println();
+void readDallasDeviceTemp(float &temperatureCelsius){
+  sensors.requestTemperatures();
+  temperatureCelsius = sensors.getTempC(insideThermometer);
+  
+  Serial.print("Dallas device temperature = ");
+  Serial.print(temperatureCelsius);
+  Serial.println(" *C");
 }
 
 void loop() {
-  float temperatureCelsius, pressureMmHg, altitudeMeters;
+  Serial.println();
+  
+  float temperatureCelsius, pressureMmHg, altitudeMeters, dallasTemperatureCelsius;
   float seaLevelPressureGPA = readSeaLevelPressureGPa();
+  
   readBMP280Value(seaLevelPressureGPA, temperatureCelsius, pressureMmHg, altitudeMeters);
 
+  if (dallasInitialized){
+    readDallasDeviceTemp(dallasTemperatureCelsius);
+  }
+
+//  delay(postingInterval);
+//return;
   ThingSpeak.setField(1, temperatureCelsius);
   ThingSpeak.setField(2, pressureMmHg);
   ThingSpeak.setField(3, altitudeMeters);
+  ThingSpeak.setField(4, dallasTemperatureCelsius);
   ThingSpeak.writeFields(channelID, writeAPIKey);
 
   delay(postingInterval);
