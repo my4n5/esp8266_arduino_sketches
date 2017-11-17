@@ -47,6 +47,9 @@ DallasTemperature sensors(&oneWire);
 DeviceAddress insideThermometer;
 bool dallasInitialized;
 
+//Notify Led settings
+#define LED_PIN D1
+
 // Wi-Fi Settings
 const char* ssid = MY_WIFI_SSID;
 const char* password = MY_WIFI_PASSWORD;
@@ -107,6 +110,8 @@ void setup() {
 
   ThingSpeak.begin(client);
   Serial.println("ThingSpeak connected");
+
+  pinMode(LED_PIN, OUTPUT);
 }
 
 float readSeaLevelPressureGPa() {
@@ -142,6 +147,7 @@ void readDallasDeviceTemp(float &temperatureCelsius) {
 }
 
 void loop() {
+  digitalWrite(LED_PIN, HIGH);
   Serial.println();
 
   float temperatureCelsius, pressureMmHg, altitudeMeters, dallasTemperatureCelsius;
@@ -152,6 +158,8 @@ void loop() {
   if (dallasInitialized) {
     readDallasDeviceTemp(dallasTemperatureCelsius);
   }
+
+  digitalWrite(LED_PIN, LOW);
 
   //  delay(postingInterval);
   //return;
